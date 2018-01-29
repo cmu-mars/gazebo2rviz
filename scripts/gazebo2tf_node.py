@@ -13,6 +13,7 @@ import pysdf
 
 tfBroadcaster = None
 submodelsToBeIgnored = []
+modelsToBeIncluded = []
 lastUpdateTime = None
 updatePeriod = 0.05
 model_cache = {}
@@ -24,6 +25,13 @@ def is_ignored(link_name):
       return True
   return False
 
+def is_included(link_name):
+  if len(modelsToBeIncluded) > 0:
+    for inc_model in modelsToBeIncluded:
+      if link_name.startswith(inc_model):
+        return True
+    return False
+  return True
 
 def on_link_states_msg(link_states_msg):
   """
@@ -42,6 +50,8 @@ def on_link_states_msg(link_states_msg):
 
   for (link_idx, link_name) in enumerate(link_states_msg.name):
     #print(link_idx, link_name)
+    if not is_included(link_name):
+      continue
     modelinstance_name = link_name.split('::')[0]
     #print('modelinstance_name:', modelinstance_name)
     model_name = pysdf.name2modelname(modelinstance_name)
@@ -70,6 +80,7 @@ def on_link_states_msg(link_states_msg):
     if is_ignored(parentinstance_link_name):
       rospy.loginfo("Ignoring TF %s -> %s" % (parentinstance_link_name, link_name))
       continue
+   
     pose = poses[link_name]
     parent_pose = poses[parentinstance_link_name]
     rel_tf = concatenate_matrices(inverse_matrix(parent_pose), pose)
@@ -85,6 +96,10 @@ def main():
   global submodelsToBeIgnored
   submodelsToBeIgnored = rospy.get_param('~ignore_submodels_of', '').split(';')
   rospy.loginfo('Ignoring submodels of: ' + str(submodelsToBeIgnored))
+
+  global modelsToBeIncluded
+  modelsToBeIncluded = rospy.get_param("~include_only_models", '').split(';')
+  rospy.loginfo("Only including models that start with: " + str(modelsToBeIncluded))
 
   global tfBroadcaster
   tfBroadcaster = tf.TransformBroadcaster()
